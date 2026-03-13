@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>MyVault</title>
+<meta name="theme-color" content="#0D0D0D"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MyVault"/>
+<link rel="manifest" id="pwa-manifest"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<script>
+// Inject PWA manifest dynamically (works in single-file HTML)
+(function(){
+  const icon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230D0D0D'/%3E%3Ctext y='.9em' font-size='72' x='50%25' text-anchor='middle'%3E%F0%9F%94%90%3C/text%3E%3C/svg%3E";
+  const manifest = {
+    name: "MyVault – Life Manager",
+    short_name: "MyVault",
+    description: "Your secure personal life vault",
+    start_url: ".",
+    display: "standalone",
+    background_color: "#0D0D0D",
+    theme_color: "#0D0D0D",
+    orientation: "portrait",
+    icons: [
+      { src: icon, sizes: "192x192", type: "image/svg+xml" },
+      { src: icon, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  document.getElementById('pwa-manifest').href = url;
+})();
+// Register service worker for offline use
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    const sw = `
+const CACHE='myvault-v1';
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['.']))));
+self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('.')))));
+`;
+    const swBlob = new Blob([sw], {type:'application/javascript'});
+    const swUrl = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl).catch(()=>{});
+  });
+}
+</script>
+<style>
+:root{--bg:#0D0D0D;--card:#181818;--card2:#222;--bdr:#2a2a2a;--acc:#F0C040;--grn:#4ADE80;--blu:#60A5FA;--pur:#A78BFA;--red:#F87171;--txt:#F5F5F5;--mut:#666;--fnt:"Sora",sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:var(--fnt);background:var(--bg);color:var(--txt);max-width:430px;margin:0 auto;min-height:100vh;overflow-x:hidden;}
+#lock{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:430px;margin:0 auto;}
+.lt{font-size:28px;font-weight:800;margin-bottom:4px;}.lt span{color:var(--acc);}
+.ls{font-size:13px;color:var(--mut);margin-bottom:34px;}
+.dots{display:flex;gap:14px;margin-bottom:30px;}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--acc);transition:all .2s;}
+.dot.on{background:var(--acc);box-shadow:0 0 10px var(--acc);}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:260px;}
+.pbtn{background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:17px;font-size:22px;font-weight:700;font-family:var(--fnt);color:var(--txt);cursor:pointer;text-align:center;}
+.pbtn:active{background:var(--acc);color:#000;}
+.pbtn.del{background:#1a0a0a;color:var(--red);}
+.perr{color:var(--red);font-size:13px;margin-top:12px;min-height:18px;text-align:center;}
+.phint{color:var(--mut);font-size:11px;margin-top:10px;}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;position:sticky;top:0;background:var(--bg);z-index:50;border-bottom:1px solid var(--bdr);}
+.brand{font-size:20px;font-weight:800;}.brand span{color:var(--acc);}
+.ibtn{background:var(--card);border:1px solid var(--bdr);border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;}
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--card);border-top:1px solid var(--bdr);display:grid;grid-template-columns:repeat(5,1fr);z-index:50;}
+.nb{padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;font-family:var(--fnt);}
+.ni{font-size:20px;}.nl{font-size:9px;font-weight:600;color:var(--mut);text-transform:uppercase;}
+.nb.on .nl{color:var(--acc);}
+.pg{display:none;padding:14px 14px 96px;}
+.pg.on{display:block;animation:up .2s ease;}
+@keyframes up{from{opacity:0;transform:translateY(8px);}to{opacity:1;}}
+.ptit{font-size:22px;font-weight:800;margin-bottom:2px;}
+.psub{font-size:12px;color:var(--mut);margin-bottom:14px;}
+.sh{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px;}
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:16px;margin-bottom:12px;}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.ct{font-size:14px;font-weight:700;}
+.ebtn{background:var(--card2);border:1px solid var(--bdr);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--acc);cursor:pointer;font-family:var(--fnt);}
+.fr{display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bdr);}
+.fr:last-child{border-bottom:none;}
+.fk{font-size:11px;color:var(--mut);width:44%;flex-shrink:0;}
+.fv{font-size:12px;font-weight:600;text-align:right;word-break:break-all;}
+.a{color:var(--acc);}.g{color:var(--grn);}.b{color:var(--blu);}.r{color:var(--red);}.p{color:var(--pur);}
+.gc{background:linear-gradient(135deg,#1a1400,#261d00);border:1px solid #342800;border-radius:18px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden;}
+.gc::after{content:"🔐";font-size:80px;position:absolute;right:-8px;top:50%;transform:translateY(-50%);opacity:.08;}
+.gn{font-size:17px;font-weight:800;color:var(--acc);}
+.gs{font-size:12px;color:#777;margin-top:2px;}
+.gd{font-size:11px;color:#444;margin-top:6px;}
+.qg{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:4px;}
+.qc{background:var(--card);border:1px solid var(--bdr);border-radius:14px;padding:13px 8px;text-align:center;cursor:pointer;}
+.qc:active{transform:scale(.95);}.qi{font-size:22px;margin-bottom:4px;}.ql{font-size:10px;font-weight:600;color:var(--mut);}
+.strip{background:var(--card);border:1px solid var(--bdr);border-radius:13px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;cursor:pointer;}
+.strip:active{background:var(--card2);}
+.sl{display:flex;align-items:center;gap:10px;}
+.sic{width:36px;height:36px;background:var(--card2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;overflow:hidden;flex-shrink:0;}
+.sic img{width:100%;height:100%;object-fit:cover;}
+.st{font-size:13px;font-weight:600;}.ss{font-size:11px;color:var(--mut);margin-top:1px;}
+/* PROFILE CIRCLE */
+.prow{display:flex;justify-content:center;margin-bottom:18px;}
+.pcirc{width:86px;height:86px;border-radius:50%;background:var(--card2);border:3px solid var(--acc);display:flex;align-items:center;justify-content:center;font-size:34px;position:relative;overflow:hidden;cursor:pointer;}
+.pcirc img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.pbadge{position:absolute;bottom:0;right:0;background:var(--acc);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;pointer-events:none;}
+.pcirc input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+/* UPLOAD ZONE */
+.uz{display:block;border:2px dashed var(--bdr);border-radius:13px;padding:14px;text-align:center;cursor:pointer;margin-bottom:10px;position:relative;background:transparent;}
+.uz input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
+.uzi{font-size:26px;margin-bottom:4px;}.uzt{font-size:13px;font-weight:700;}.uzs{font-size:10px;color:var(--mut);margin-top:2px;}
+/* PHOTO GRID */
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:4px;}
+.pt{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--card2);}
+.pt img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+.pdel{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.85);border:none;border-radius:50%;width:22px;height:22px;font-size:11px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;}
+/* DOC SECTION */
+.ds{background:var(--card);border:1px solid var(--bdr);border-radius:16px;margin-bottom:12px;overflow:hidden;}
+.dsh{padding:12px 14px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--bdr);}
+.dsi{font-size:24px;}.dsn{font-size:14px;font-weight:700;}.dsm{font-size:11px;color:var(--mut);margin-top:1px;}
+.dsbadge{margin-left:auto;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;flex-shrink:0;}
+.bok{background:#0a2a0a;color:var(--grn);}.bno{background:#1a1800;color:var(--acc);}
+.dsb{padding:12px 14px;}
+.dnum{width:100%;background:var(--bg);border:1.5px solid var(--bdr);border-radius:11px;padding:10px 12px;font-size:13px;font-family:var(--fnt);color:var(--txt);outline:none;margin-bottom:10px;}
+.dnum:focus{border-color:var(--acc);}
+/* MEMBER LIST */
+.mstrip{background:var(--card);border:1px solid var(--bdr);border-radius:13px;padding:13px 14px;display:flex;align-items:center;gap:12px;margin-bottom:9px;cursor:pointer;}
+.mstrip:active{background:var(--card2);}
+.mav{width:50px;height:50px;border-radius:13px;overflow:hidden;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:24px;}
+.mav img{width:100%;height:100%;object-fit:cover;}
+/* MEMBER DETAIL PAGE */
+.backbtn{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:9px 14px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;margin-bottom:14px;font-family:var(--fnt);}
+.sec-label{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;margin:14px 0 8px;}
+/* FAM AVATAR big */
+.fav-big{width:80px;height:80px;border-radius:50%;background:var(--card2);border:3px solid var(--acc);display:flex;align-items:center;justify-content:center;font-size:32px;position:relative;overflow:hidden;cursor:pointer;margin:0 auto 6px;}
+.fav-big img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.fav-big input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.fav-badge{position:absolute;bottom:0;right:0;background:var(--acc);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;pointer-events:none;}
+/* BANK LIST */
+.bstrip{background:linear-gradient(135deg,#180a28,#280a18);border:1px solid #381848;border-radius:16px;padding:14px 16px;margin-bottom:10px;cursor:pointer;}
+.bstrip:active{filter:brightness(1.1);}
+.bname{font-size:14px;font-weight:700;color:var(--pur);}.bnum{font-size:16px;font-weight:800;letter-spacing:2px;margin:4px 0 8px;}
+.brow{display:flex;justify-content:space-between;}.bfl{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;}.bfv{font-size:12px;font-weight:700;margin-top:2px;}
+/* VEHICLE */
+.vc{background:linear-gradient(135deg,#0a0a18,#18182e);border:1px solid #28284a;border-radius:18px;padding:16px;margin-bottom:12px;}
+.vnum{font-size:20px;font-weight:800;color:var(--blu);letter-spacing:1px;}
+.vg{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px;}
+.vf{background:rgba(255,255,255,.04);border-radius:9px;padding:8px;}
+.vfl{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;}.vfv{font-size:12px;font-weight:700;margin-top:2px;}
+/* FINANCE */
+.fb{background:linear-gradient(135deg,#081808,#0e280e);border:1px solid #183818;border-radius:18px;padding:18px;margin-bottom:14px;}
+.fbl{font-size:10px;color:#4ADE8066;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;}
+.fbs{font-size:30px;font-weight:800;color:var(--grn);}
+.fbr{display:flex;justify-content:space-between;margin-top:10px;}
+.fbv{font-size:14px;font-weight:700;}.fbm{font-size:10px;color:var(--mut);margin-top:1px;}
+.ei{background:var(--card);border:1px solid var(--bdr);border-radius:11px;padding:11px 13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;display:flex;align-items:flex-end;justify-content:center;max-width:430px;margin:0 auto;opacity:0;pointer-events:none;transition:opacity .2s;}
+.mo.on{opacity:1;pointer-events:all;}
+.ms{background:var(--card);border-radius:22px 22px 0 0;width:100%;padding:18px 16px 44px;max-height:92vh;overflow-y:auto;transform:translateY(28px);transition:transform .2s;}
+.mo.on .ms{transform:translateY(0);}
+.mh{width:34px;height:4px;background:var(--bdr);border-radius:3px;margin:0 auto 16px;}
+.mt{font-size:17px;font-weight:800;margin-bottom:16px;}
+.fg{margin-bottom:12px;}.fl{display:block;font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.fi{width:100%;background:var(--bg);border:1.5px solid var(--bdr);border-radius:11px;padding:10px 12px;font-size:13px;font-family:var(--fnt);color:var(--txt);outline:none;}
+.fi:focus{border-color:var(--acc);}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sbtn{width:100%;background:var(--acc);color:#000;border:none;border-radius:13px;padding:13px;font-size:14px;font-weight:800;font-family:var(--fnt);cursor:pointer;margin-top:5px;}
+.xbtn{width:100%;background:var(--card2);color:var(--mut);border:1px solid var(--bdr);border-radius:13px;padding:11px;font-size:13px;font-weight:600;font-family:var(--fnt);cursor:pointer;margin-top:7px;}
+.dbtn{width:100%;background:#2a0808;color:var(--red);border:1px solid #3a1010;border-radius:13px;padding:11px;font-size:13px;font-weight:700;font-family:var(--fnt);cursor:pointer;margin-top:7px;}
+.addbtn{background:var(--card);border:2px dashed var(--bdr);border-radius:14px;padding:14px;text-align:center;cursor:pointer;color:var(--mut);font-size:13px;font-weight:600;width:100%;font-family:var(--fnt);margin-top:3px;}
+.addbtn:active{background:var(--card2);}
+#vw{position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;max-width:430px;margin:0 auto;}
+#vw.on{display:flex;}
+#vwi{max-width:100%;max-height:72vh;border-radius:10px;object-fit:contain;}
+.vwx{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.1);border:none;border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;}
+#vw-label{color:#777;font-size:11px;margin-top:10px;text-align:center;}
+#vw-actions{display:flex;gap:12px;margin-top:14px;}
+.vw-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:11px 22px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--fnt);display:flex;align-items:center;gap:7px;}
+.vw-btn.dl{background:var(--acc);color:#000;border-color:var(--acc);}
+.vw-btn:active{opacity:.8;}
+#tst{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:#0a1f0a;color:var(--grn);border:1px solid var(--grn);border-radius:28px;padding:9px 20px;font-size:13px;font-weight:700;z-index:600;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;}
+#tst.on{opacity:1;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:var(--bdr);}
+</style>
+</head>
+<body>
+
+<!-- ══ LOCK ══ -->
+<div id="lock">
+  <div style="font-size:60px;margin-bottom:8px;">🔐</div>
+  <div class="lt">My<span>Vault</span></div>
+  <div class="ls">Enter your 4‑digit PIN</div>
+  <div class="dots"><div class="dot" id="d0"></div><div class="dot" id="d1"></div><div class="dot" id="d2"></div><div class="dot" id="d3"></div></div>
+  <div class="pad">
+    <button class="pbtn" onclick="pt('1')">1</button><button class="pbtn" onclick="pt('2')">2</button><button class="pbtn" onclick="pt('3')">3</button>
+    <button class="pbtn" onclick="pt('4')">4</button><button class="pbtn" onclick="pt('5')">5</button><button class="pbtn" onclick="pt('6')">6</button>
+    <button class="pbtn" onclick="pt('7')">7</button><button class="pbtn" onclick="pt('8')">8</button><button class="pbtn" onclick="pt('9')">9</button>
+    <div></div><button class="pbtn" onclick="pt('0')">0</button><button class="pbtn del" onclick="pd()">⌫</button>
+  </div>
+  <div class="perr" id="perr"></div>
+  <div class="phint">Default PIN: 1234</div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app" style="display:none">
+<div class="bar"><div class="brand">My<span>Vault</span></div><div style="display:flex;gap:8px;"><div class="ibtn" id="install-btn" onclick="installApp()" title="Install App" style="display:none">📲</div><div class="ibtn" onclick="downloadBackup()" title="Download backup">💾</div><div class="ibtn" onclick="lockApp()" title="Lock">🔒</div></div></div>
+
+<!-- HOME -->
+<div class="pg on" id="p-home">
+  <div class="gc"><div class="gn" id="gn">Hello 👋</div><div class="gs" id="gs">Your life vault</div><div class="gd" id="gd"></div></div>
+  <div class="sh">Quick Access</div>
+  <div class="qg">
+    <div class="qc" onclick="go('id')"><div class="qi">🪪</div><div class="ql">Identity</div></div>
+    <div class="qc" onclick="go('fam')"><div class="qi">👨‍👩‍👧</div><div class="ql">Family</div></div>
+    <div class="qc" onclick="go('fin')"><div class="qi">💰</div><div class="ql">Finance</div></div>
+    <div class="qc" onclick="go('doc')"><div class="qi">📄</div><div class="ql">Docs</div></div>
+    <div class="qc" onclick="go('veh')"><div class="qi">🏍️</div><div class="ql">Vehicles</div></div>
+    <div class="qc" onclick="go('bnk')"><div class="qi">🏦</div><div class="ql">Bank</div></div>
+  </div>
+  <div class="sh">Overview</div>
+  <div class="strip" onclick="go('id')"><div class="sl"><div class="sic" id="hav">👤</div><div><div class="st" id="hn">My Profile</div><div class="ss" id="hp">Tap to add</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="strip" onclick="go('fam')"><div class="sl"><div class="sic">👨‍👩‍👧</div><div><div class="st">Family</div><div class="ss" id="hf">Tap to add</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="strip" onclick="go('fin')"><div class="sl"><div class="sic">💵</div><div><div class="st">Finance</div><div class="ss" id="hfi">Tap to add</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="strip" onclick="go('veh')"><div class="sl"><div class="sic">🏍️</div><div><div class="st">Vehicles</div><div class="ss" id="hv">Tap to add</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="strip" onclick="go('bnk')"><div class="sl"><div class="sic">🏦</div><div><div class="st">Bank Accounts</div><div class="ss" id="hb">Tap to add</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="sh">Settings</div>
+  <div class="strip" onclick="om('changepin')"><div class="sl"><div class="sic">🔑</div><div><div class="st">Change PIN</div><div class="ss">Update your 4-digit unlock PIN</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="strip" onclick="installApp()"><div class="sl"><div class="sic">📲</div><div><div class="st">Install as App</div><div class="ss">Add to your phone home screen</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="strip" onclick="downloadBackup()"><div class="sl"><div class="sic">💾</div><div><div class="st">Download Backup</div><div class="ss">Export all data as .json file</div></div></div><div style="color:var(--mut)">›</div></div>
+  <div class="strip" onclick="importBackup()"><div class="sl"><div class="sic">📥</div><div><div class="st">Restore Backup</div><div class="ss">Import from a .json backup file</div></div></div><div style="color:var(--mut)">›</div></div>
+</div>
+
+<!-- IDENTITY -->
+<div class="pg" id="p-id">
+  <div class="ptit">🪪 My Identity</div><div class="psub">Personal info, IDs, medical</div>
+  <div class="prow"><div class="pcirc" id="pcirc"><span id="pemo">👤</span><img id="pimg" src="" style="display:none"/><div class="pbadge">📷</div><input type="file" accept="image/*" id="inp-profile"/></div></div>
+  <div class="card"><div class="ch"><div class="ct">👤 Personal Info</div><button class="ebtn" onclick="om('personal')">Edit</button></div>
+    <div class="fr"><span class="fk">Name</span><span class="fv a" id="v-name">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="v-dob">—</span></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="v-age">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="v-blood">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="v-phone">—</span></div>
+    <div class="fr"><span class="fk">Alt Phone</span><span class="fv" id="v-alt">—</span></div>
+    <div class="fr"><span class="fk">Email</span><span class="fv" id="v-email">—</span></div>
+    <div class="fr"><span class="fk">Address</span><span class="fv" id="v-addr">—</span></div>
+  </div>
+  <div class="card"><div class="ch"><div class="ct">🪪 ID Numbers</div><button class="ebtn" onclick="om('ids')">Edit</button></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="v-aad">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="v-pan">—</span></div>
+    <div class="fr"><span class="fk">Voter ID</span><span class="fv" id="v-vot">—</span></div>
+    <div class="fr"><span class="fk">Driving Licence</span><span class="fv" id="v-dl">—</span></div>
+    <div class="fr"><span class="fk">Passport</span><span class="fv" id="v-pass">—</span></div>
+    <div class="fr"><span class="fk">Ration Card</span><span class="fv" id="v-rat">—</span></div>
+  </div>
+  <div class="card"><div class="ch"><div class="ct">🏥 Medical</div><button class="ebtn" onclick="om('med')">Edit</button></div>
+    <div class="fr"><span class="fk">Allergies</span><span class="fv" id="v-all">—</span></div>
+    <div class="fr"><span class="fk">Doctor</span><span class="fv" id="v-doc">—</span></div>
+    <div class="fr"><span class="fk">Doctor Phone</span><span class="fv b" id="v-dph">—</span></div>
+    <div class="fr"><span class="fk">Hospital</span><span class="fv" id="v-hosp">—</span></div>
+    <div class="fr"><span class="fk">Insurance No.</span><span class="fv g" id="v-ins">—</span></div>
+  </div>
+  <div class="card"><div class="ch"><div class="ct">📷 My Photos</div></div>
+    <label class="uz"><div class="uzi">📸</div><div class="uzt">Tap to add your photos</div><div class="uzs">Gallery or camera — multiple ok</div><input type="file" accept="image/*" multiple id="inp-myphotos"/></label>
+    <div class="pgrid" id="g-myphotos"></div>
+  </div>
+</div>
+
+<!-- DOCUMENTS -->
+<div class="pg" id="p-doc">
+  <div class="ptit">📄 Documents</div><div class="psub">Number + photo upload for every document</div>
+  <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="dm-aadhaar">Not saved</div></div><div class="dsbadge bno" id="db-aadhaar">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-aadhaar" placeholder="XXXX XXXX XXXX"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Front & back — multiple ok</div><input type="file" accept="image/*" multiple id="inp-doc-aadhaar"/></label>
+  <div class="pgrid" id="g-doc-aadhaar"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="dm-pan">Not saved</div></div><div class="dsbadge bno" id="db-pan">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-pan" placeholder="ABCDE1234F"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Front side photo</div><input type="file" accept="image/*" multiple id="inp-doc-pan"/></label>
+  <div class="pgrid" id="g-doc-pan"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="dm-dl">Not saved</div></div><div class="dsbadge bno" id="db-dl">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-dl" placeholder="DL number"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Front & back</div><input type="file" accept="image/*" multiple id="inp-doc-dl"/></label>
+  <div class="pgrid" id="g-doc-dl"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="dm-voter">Not saved</div></div><div class="dsbadge bno" id="db-voter">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-voter" placeholder="Voter ID number"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Front & back</div><input type="file" accept="image/*" multiple id="inp-doc-voter"/></label>
+  <div class="pgrid" id="g-doc-voter"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">📒</div><div style="flex:1"><div class="dsn">Passport</div><div class="dsm" id="dm-passport">Not saved</div></div><div class="dsbadge bno" id="db-passport">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-passport" placeholder="Passport number"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Passport</div><div class="uzs">Photo page & address page</div><input type="file" accept="image/*" multiple id="inp-doc-passport"/></label>
+  <div class="pgrid" id="g-doc-passport"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">🏠</div><div style="flex:1"><div class="dsn">Ration Card</div><div class="dsm" id="dm-ration">Not saved</div></div><div class="dsbadge bno" id="db-ration">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-ration" placeholder="Ration card number"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Ration Card</div><div class="uzs">All pages</div><input type="file" accept="image/*" multiple id="inp-doc-ration"/></label>
+  <div class="pgrid" id="g-doc-ration"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Study Certificates</div><div class="dsm" id="dm-study">Not saved</div></div><div class="dsbadge bno" id="db-study">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-study" placeholder="e.g. B.Tech, College 2021"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Study Certificates</div><div class="uzs">10th, 12th, Degree etc.</div><input type="file" accept="image/*" multiple id="inp-doc-study"/></label>
+  <div class="pgrid" id="g-doc-study"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Hospital Reports</div><div class="dsm" id="dm-hospital">Not saved</div></div><div class="dsbadge bno" id="db-hospital">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-hospital" placeholder="e.g. Blood test 2025"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Hospital Reports</div><div class="uzs">Lab reports, prescriptions</div><input type="file" accept="image/*" multiple id="inp-doc-hospital"/></label>
+  <div class="pgrid" id="g-doc-hospital"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">🛡️</div><div style="flex:1"><div class="dsn">Insurance</div><div class="dsm" id="dm-insurance">Not saved</div></div><div class="dsbadge bno" id="db-insurance">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-insurance" placeholder="Policy number / company"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Insurance</div><div class="uzs">Health, vehicle, life</div><input type="file" accept="image/*" multiple id="inp-doc-insurance"/></label>
+  <div class="pgrid" id="g-doc-insurance"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">🌾</div><div style="flex:1"><div class="dsn">Land Documents</div><div class="dsm" id="dm-land">Not saved</div></div><div class="dsbadge bno" id="db-land">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-land" placeholder="Patta / Survey number"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Land Documents</div><div class="uzs">Patta, chitta, sale deed</div><input type="file" accept="image/*" multiple id="inp-doc-land"/></label>
+  <div class="pgrid" id="g-doc-land"></div></div></div>
+  <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Documents</div><div class="dsm" id="dm-other">Not saved</div></div><div class="dsbadge bno" id="db-other">Add</div></div>
+  <div class="dsb"><input class="dnum" id="dn-other" placeholder="Description or notes"/>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Documents</div><div class="uzs">Any important document</div><input type="file" accept="image/*" multiple id="inp-doc-other"/></label>
+  <div class="pgrid" id="g-doc-other"></div></div></div>
+</div>
+
+<!-- FAMILY LIST -->
+<div class="pg" id="p-fam">
+  <div class="ptit">👨‍👩‍👧 Family</div><div class="psub">Tap a member to see full details & upload docs</div>
+  <div id="famlist"></div>
+  <button class="addbtn" onclick="om('addmem')">+ Add Family Member</button>
+</div>
+<!-- FAMILY MEMBER 0 DETAIL -->
+<div class="pg" id="p-fam-0" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-0">
+      <span id="favemo-0">👤</span>
+      <img id="favimg-0" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-0-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-0">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-0"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',0)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-0">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-0">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-0">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-0">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-0">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-0">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-0">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-0-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-0-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-0-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-0-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-0-pan">No photos</div></div><div class="dsbadge bno" id="fdb-0-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-0-pan"/></label>
+        <div class="pgrid" id="g-fam-0-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-0-dl">No photos</div></div><div class="dsbadge bno" id="fdb-0-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-0-dl"/></label>
+        <div class="pgrid" id="g-fam-0-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-0-voter">No photos</div></div><div class="dsbadge bno" id="fdb-0-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-0-voter"/></label>
+        <div class="pgrid" id="g-fam-0-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-0-study">No photos</div></div><div class="dsbadge bno" id="fdb-0-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-0-study"/></label>
+        <div class="pgrid" id="g-fam-0-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-0-medical">No photos</div></div><div class="dsbadge bno" id="fdb-0-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-0-medical"/></label>
+        <div class="pgrid" id="g-fam-0-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-0-other">No photos</div></div><div class="dsbadge bno" id="fdb-0-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-0-other"/></label>
+        <div class="pgrid" id="g-fam-0-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(0)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 1 DETAIL -->
+<div class="pg" id="p-fam-1" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-1">
+      <span id="favemo-1">👤</span>
+      <img id="favimg-1" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-1-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-1">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-1"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',1)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-1">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-1">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-1">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-1">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-1">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-1">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-1">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-1-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-1-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-1-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-1-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-1-pan">No photos</div></div><div class="dsbadge bno" id="fdb-1-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-1-pan"/></label>
+        <div class="pgrid" id="g-fam-1-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-1-dl">No photos</div></div><div class="dsbadge bno" id="fdb-1-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-1-dl"/></label>
+        <div class="pgrid" id="g-fam-1-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-1-voter">No photos</div></div><div class="dsbadge bno" id="fdb-1-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-1-voter"/></label>
+        <div class="pgrid" id="g-fam-1-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-1-study">No photos</div></div><div class="dsbadge bno" id="fdb-1-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-1-study"/></label>
+        <div class="pgrid" id="g-fam-1-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-1-medical">No photos</div></div><div class="dsbadge bno" id="fdb-1-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-1-medical"/></label>
+        <div class="pgrid" id="g-fam-1-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-1-other">No photos</div></div><div class="dsbadge bno" id="fdb-1-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-1-other"/></label>
+        <div class="pgrid" id="g-fam-1-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(1)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 2 DETAIL -->
+<div class="pg" id="p-fam-2" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-2">
+      <span id="favemo-2">👤</span>
+      <img id="favimg-2" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-2-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-2">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-2"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',2)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-2">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-2">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-2">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-2">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-2">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-2">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-2">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-2-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-2-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-2-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-2-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-2-pan">No photos</div></div><div class="dsbadge bno" id="fdb-2-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-2-pan"/></label>
+        <div class="pgrid" id="g-fam-2-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-2-dl">No photos</div></div><div class="dsbadge bno" id="fdb-2-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-2-dl"/></label>
+        <div class="pgrid" id="g-fam-2-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-2-voter">No photos</div></div><div class="dsbadge bno" id="fdb-2-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-2-voter"/></label>
+        <div class="pgrid" id="g-fam-2-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-2-study">No photos</div></div><div class="dsbadge bno" id="fdb-2-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-2-study"/></label>
+        <div class="pgrid" id="g-fam-2-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-2-medical">No photos</div></div><div class="dsbadge bno" id="fdb-2-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-2-medical"/></label>
+        <div class="pgrid" id="g-fam-2-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-2-other">No photos</div></div><div class="dsbadge bno" id="fdb-2-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-2-other"/></label>
+        <div class="pgrid" id="g-fam-2-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(2)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 3 DETAIL -->
+<div class="pg" id="p-fam-3" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-3">
+      <span id="favemo-3">👤</span>
+      <img id="favimg-3" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-3-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-3">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-3"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',3)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-3">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-3">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-3">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-3">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-3">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-3">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-3">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-3-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-3-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-3-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-3-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-3-pan">No photos</div></div><div class="dsbadge bno" id="fdb-3-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-3-pan"/></label>
+        <div class="pgrid" id="g-fam-3-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-3-dl">No photos</div></div><div class="dsbadge bno" id="fdb-3-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-3-dl"/></label>
+        <div class="pgrid" id="g-fam-3-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-3-voter">No photos</div></div><div class="dsbadge bno" id="fdb-3-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-3-voter"/></label>
+        <div class="pgrid" id="g-fam-3-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-3-study">No photos</div></div><div class="dsbadge bno" id="fdb-3-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-3-study"/></label>
+        <div class="pgrid" id="g-fam-3-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-3-medical">No photos</div></div><div class="dsbadge bno" id="fdb-3-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-3-medical"/></label>
+        <div class="pgrid" id="g-fam-3-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-3-other">No photos</div></div><div class="dsbadge bno" id="fdb-3-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-3-other"/></label>
+        <div class="pgrid" id="g-fam-3-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(3)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 4 DETAIL -->
+<div class="pg" id="p-fam-4" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-4">
+      <span id="favemo-4">👤</span>
+      <img id="favimg-4" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-4-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-4">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-4"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',4)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-4">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-4">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-4">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-4">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-4">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-4">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-4">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-4-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-4-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-4-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-4-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-4-pan">No photos</div></div><div class="dsbadge bno" id="fdb-4-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-4-pan"/></label>
+        <div class="pgrid" id="g-fam-4-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-4-dl">No photos</div></div><div class="dsbadge bno" id="fdb-4-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-4-dl"/></label>
+        <div class="pgrid" id="g-fam-4-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-4-voter">No photos</div></div><div class="dsbadge bno" id="fdb-4-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-4-voter"/></label>
+        <div class="pgrid" id="g-fam-4-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-4-study">No photos</div></div><div class="dsbadge bno" id="fdb-4-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-4-study"/></label>
+        <div class="pgrid" id="g-fam-4-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-4-medical">No photos</div></div><div class="dsbadge bno" id="fdb-4-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-4-medical"/></label>
+        <div class="pgrid" id="g-fam-4-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-4-other">No photos</div></div><div class="dsbadge bno" id="fdb-4-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-4-other"/></label>
+        <div class="pgrid" id="g-fam-4-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(4)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 5 DETAIL -->
+<div class="pg" id="p-fam-5" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-5">
+      <span id="favemo-5">👤</span>
+      <img id="favimg-5" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-5-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-5">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-5"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',5)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-5">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-5">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-5">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-5">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-5">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-5">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-5">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-5-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-5-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-5-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-5-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-5-pan">No photos</div></div><div class="dsbadge bno" id="fdb-5-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-5-pan"/></label>
+        <div class="pgrid" id="g-fam-5-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-5-dl">No photos</div></div><div class="dsbadge bno" id="fdb-5-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-5-dl"/></label>
+        <div class="pgrid" id="g-fam-5-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-5-voter">No photos</div></div><div class="dsbadge bno" id="fdb-5-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-5-voter"/></label>
+        <div class="pgrid" id="g-fam-5-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-5-study">No photos</div></div><div class="dsbadge bno" id="fdb-5-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-5-study"/></label>
+        <div class="pgrid" id="g-fam-5-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-5-medical">No photos</div></div><div class="dsbadge bno" id="fdb-5-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-5-medical"/></label>
+        <div class="pgrid" id="g-fam-5-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-5-other">No photos</div></div><div class="dsbadge bno" id="fdb-5-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-5-other"/></label>
+        <div class="pgrid" id="g-fam-5-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(5)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 6 DETAIL -->
+<div class="pg" id="p-fam-6" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-6">
+      <span id="favemo-6">👤</span>
+      <img id="favimg-6" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-6-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-6">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-6"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',6)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-6">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-6">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-6">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-6">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-6">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-6">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-6">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-6-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-6-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-6-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-6-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-6-pan">No photos</div></div><div class="dsbadge bno" id="fdb-6-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-6-pan"/></label>
+        <div class="pgrid" id="g-fam-6-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-6-dl">No photos</div></div><div class="dsbadge bno" id="fdb-6-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-6-dl"/></label>
+        <div class="pgrid" id="g-fam-6-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-6-voter">No photos</div></div><div class="dsbadge bno" id="fdb-6-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-6-voter"/></label>
+        <div class="pgrid" id="g-fam-6-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-6-study">No photos</div></div><div class="dsbadge bno" id="fdb-6-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-6-study"/></label>
+        <div class="pgrid" id="g-fam-6-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-6-medical">No photos</div></div><div class="dsbadge bno" id="fdb-6-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-6-medical"/></label>
+        <div class="pgrid" id="g-fam-6-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-6-other">No photos</div></div><div class="dsbadge bno" id="fdb-6-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-6-other"/></label>
+        <div class="pgrid" id="g-fam-6-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(6)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 7 DETAIL -->
+<div class="pg" id="p-fam-7" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-7">
+      <span id="favemo-7">👤</span>
+      <img id="favimg-7" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-7-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-7">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-7"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',7)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-7">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-7">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-7">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-7">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-7">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-7">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-7">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-7-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-7-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-7-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-7-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-7-pan">No photos</div></div><div class="dsbadge bno" id="fdb-7-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-7-pan"/></label>
+        <div class="pgrid" id="g-fam-7-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-7-dl">No photos</div></div><div class="dsbadge bno" id="fdb-7-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-7-dl"/></label>
+        <div class="pgrid" id="g-fam-7-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-7-voter">No photos</div></div><div class="dsbadge bno" id="fdb-7-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-7-voter"/></label>
+        <div class="pgrid" id="g-fam-7-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-7-study">No photos</div></div><div class="dsbadge bno" id="fdb-7-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-7-study"/></label>
+        <div class="pgrid" id="g-fam-7-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-7-medical">No photos</div></div><div class="dsbadge bno" id="fdb-7-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-7-medical"/></label>
+        <div class="pgrid" id="g-fam-7-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-7-other">No photos</div></div><div class="dsbadge bno" id="fdb-7-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-7-other"/></label>
+        <div class="pgrid" id="g-fam-7-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(7)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 8 DETAIL -->
+<div class="pg" id="p-fam-8" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-8">
+      <span id="favemo-8">👤</span>
+      <img id="favimg-8" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-8-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-8">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-8"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',8)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-8">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-8">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-8">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-8">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-8">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-8">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-8">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-8-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-8-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-8-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-8-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-8-pan">No photos</div></div><div class="dsbadge bno" id="fdb-8-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-8-pan"/></label>
+        <div class="pgrid" id="g-fam-8-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-8-dl">No photos</div></div><div class="dsbadge bno" id="fdb-8-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-8-dl"/></label>
+        <div class="pgrid" id="g-fam-8-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-8-voter">No photos</div></div><div class="dsbadge bno" id="fdb-8-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-8-voter"/></label>
+        <div class="pgrid" id="g-fam-8-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-8-study">No photos</div></div><div class="dsbadge bno" id="fdb-8-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-8-study"/></label>
+        <div class="pgrid" id="g-fam-8-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-8-medical">No photos</div></div><div class="dsbadge bno" id="fdb-8-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-8-medical"/></label>
+        <div class="pgrid" id="g-fam-8-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-8-other">No photos</div></div><div class="dsbadge bno" id="fdb-8-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-8-other"/></label>
+        <div class="pgrid" id="g-fam-8-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(8)">🗑️ Remove this member</button>
+</div>
+<!-- FAMILY MEMBER 9 DETAIL -->
+<div class="pg" id="p-fam-9" style="display:none;">
+  <button class="backbtn" onclick="go('fam')">← Back to Family</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="fav-big" id="favbig-9">
+      <span id="favemo-9">👤</span>
+      <img id="favimg-9" src="" style="display:none"/>
+      <div class="fav-badge">📷</div>
+      <input type="file" accept="image/*" id="inp-fam-9-profile"/>
+    </div>
+    <div style="font-size:15px;font-weight:800;" id="fname-9">Member</div>
+    <div style="font-size:11px;color:var(--acc);margin-top:2px;" id="frel-9"></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Details</div><button class="ebtn" onclick="om('editmem',9)">Edit</button></div>
+    <div class="fr"><span class="fk">Age</span><span class="fv g" id="fage-9">—</span></div>
+    <div class="fr"><span class="fk">Phone</span><span class="fv b" id="fphone-9">—</span></div>
+    <div class="fr"><span class="fk">Aadhaar</span><span class="fv a" id="faad-9">—</span></div>
+    <div class="fr"><span class="fk">PAN</span><span class="fv" id="fpan-9">—</span></div>
+    <div class="fr"><span class="fk">Blood Group</span><span class="fv r" id="fblood-9">—</span></div>
+    <div class="fr"><span class="fk">Date of Birth</span><span class="fv" id="fdob-9">—</span></div>
+    <div class="fr"><span class="fk">Notes</span><span class="fv" id="fnote-9">—</span></div>
+  </div>
+  <div class="ptit" style="font-size:16px;margin-bottom:12px;">📄 Documents & Photos</div>
+  
+      <div class="ds"><div class="dsh"><div class="dsi">🪪</div><div style="flex:1"><div class="dsn">Aadhaar Card</div><div class="dsm" id="fdm-9-aadhaar">No photos</div></div><div class="dsbadge bno" id="fdb-9-aadhaar">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Aadhaar Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-9-aadhaar"/></label>
+        <div class="pgrid" id="g-fam-9-aadhaar"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">💳</div><div style="flex:1"><div class="dsn">PAN Card</div><div class="dsm" id="fdm-9-pan">No photos</div></div><div class="dsbadge bno" id="fdb-9-pan">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload PAN Card</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-9-pan"/></label>
+        <div class="pgrid" id="g-fam-9-pan"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🚗</div><div style="flex:1"><div class="dsn">Driving Licence</div><div class="dsm" id="fdm-9-dl">No photos</div></div><div class="dsbadge bno" id="fdb-9-dl">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Driving Licence</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-9-dl"/></label>
+        <div class="pgrid" id="g-fam-9-dl"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🗳️</div><div style="flex:1"><div class="dsn">Voter ID</div><div class="dsm" id="fdm-9-voter">No photos</div></div><div class="dsbadge bno" id="fdb-9-voter">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Voter ID</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-9-voter"/></label>
+        <div class="pgrid" id="g-fam-9-voter"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🎓</div><div style="flex:1"><div class="dsn">Certificates</div><div class="dsm" id="fdm-9-study">No photos</div></div><div class="dsbadge bno" id="fdb-9-study">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Certificates</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-9-study"/></label>
+        <div class="pgrid" id="g-fam-9-study"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">🏥</div><div style="flex:1"><div class="dsn">Medical Reports</div><div class="dsm" id="fdm-9-medical">No photos</div></div><div class="dsbadge bno" id="fdb-9-medical">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Medical Reports</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-9-medical"/></label>
+        <div class="pgrid" id="g-fam-9-medical"></div>
+      </div></div>
+      <div class="ds"><div class="dsh"><div class="dsi">📁</div><div style="flex:1"><div class="dsn">Other Docs</div><div class="dsm" id="fdm-9-other">No photos</div></div><div class="dsbadge bno" id="fdb-9-other">Add</div></div>
+      <div class="dsb">
+        <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Other Docs</div><div class="uzs">Tap here — camera or gallery</div><input type="file" accept="image/*" multiple id="inp-fam-9-other"/></label>
+        <div class="pgrid" id="g-fam-9-other"></div>
+      </div></div>
+  <button class="dbtn" onclick="delMem(9)">🗑️ Remove this member</button>
+</div>
+<!-- FINANCE -->
+<div class="pg" id="p-fin">
+  <div class="ptit">💰 Finance</div><div class="psub">Salary, savings & expenses</div>
+  <div class="fb"><div class="fbl">Monthly Salary</div><div class="fbs" id="vs">₹0</div>
+    <div class="fbr"><div><div class="fbv g" id="vsav">₹0</div><div class="fbm">Savings</div></div><div><div class="fbv r" id="vte">₹0</div><div class="fbm">Expenses</div></div><div><div class="fbv a" id="vbal">₹0</div><div class="fbm">Balance</div></div></div>
+  </div>
+  <button class="ebtn" style="margin-bottom:12px;padding:9px 16px;" onclick="om('sal')">✏️ Edit Salary</button>
+  <div class="sh">Monthly Expenses</div>
+  <div id="explist"></div>
+  <button class="addbtn" onclick="om('addexp')">+ Add Expense</button>
+</div>
+
+<!-- VEHICLE -->
+<div class="pg" id="p-veh">
+  <div class="ptit">🏍️ Vehicles</div><div class="psub">Details & photos</div>
+  <div id="vehlist"></div>
+  <button class="addbtn" onclick="om('addveh')">+ Add Vehicle</button>
+</div>
+<!-- BANK 0 DETAIL -->
+<div class="pg" id="p-bnk-0" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-0"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-0"/></label>
+  <div class="pgrid" id="g-bnk-0"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(0)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 1 DETAIL -->
+<div class="pg" id="p-bnk-1" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-1"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-1"/></label>
+  <div class="pgrid" id="g-bnk-1"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(1)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 2 DETAIL -->
+<div class="pg" id="p-bnk-2" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-2"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-2"/></label>
+  <div class="pgrid" id="g-bnk-2"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(2)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 3 DETAIL -->
+<div class="pg" id="p-bnk-3" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-3"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-3"/></label>
+  <div class="pgrid" id="g-bnk-3"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(3)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 4 DETAIL -->
+<div class="pg" id="p-bnk-4" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-4"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-4"/></label>
+  <div class="pgrid" id="g-bnk-4"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(4)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 5 DETAIL -->
+<div class="pg" id="p-bnk-5" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-5"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-5"/></label>
+  <div class="pgrid" id="g-bnk-5"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(5)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 6 DETAIL -->
+<div class="pg" id="p-bnk-6" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-6"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-6"/></label>
+  <div class="pgrid" id="g-bnk-6"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(6)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 7 DETAIL -->
+<div class="pg" id="p-bnk-7" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-7"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-7"/></label>
+  <div class="pgrid" id="g-bnk-7"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(7)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 8 DETAIL -->
+<div class="pg" id="p-bnk-8" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-8"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-8"/></label>
+  <div class="pgrid" id="g-bnk-8"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(8)">🗑️ Remove this account</button>
+</div>
+<!-- BANK 9 DETAIL -->
+<div class="pg" id="p-bnk-9" style="display:none;">
+  <button class="backbtn" onclick="go('bnk')">← Back to Banks</button>
+  <div id="bnk-info-9"></div>
+  <div class="ptit" style="font-size:15px;margin:14px 0 10px;">📷 Passbook / Cheque / Card Photos</div>
+  <label class="uz"><div class="uzi">📷</div><div class="uzt">Upload Bank Documents</div><div class="uzs">Passbook, cheque, bank card — multiple ok</div><input type="file" accept="image/*" multiple id="inp-bnk-9"/></label>
+  <div class="pgrid" id="g-bnk-9"></div>
+  <button class="dbtn" style="margin-top:16px;" onclick="delBnk(9)">🗑️ Remove this account</button>
+</div>
+<!-- BANK LIST -->
+<div class="pg" id="p-bnk">
+  <div class="ptit">🏦 Bank Accounts</div><div class="psub">Tap account to add passbook / cheque photos</div>
+  <div id="bnklist"></div>
+  <button class="addbtn" onclick="om('addbnk')">+ Add Bank Account</button>
+</div>
+
+<div class="bnav">
+  <button class="nb on" onclick="go('home',this)"><div class="ni">🏠</div><div class="nl">Home</div></button>
+  <button class="nb" onclick="go('id',this)"><div class="ni">🪪</div><div class="nl">Identity</div></button>
+  <button class="nb" onclick="go('doc',this)"><div class="ni">📄</div><div class="nl">Docs</div></button>
+  <button class="nb" onclick="go('fam',this)"><div class="ni">👨‍👩‍👧</div><div class="nl">Family</div></button>
+  <button class="nb" onclick="go('bnk',this)"><div class="ni">🏦</div><div class="nl">Bank</div></button>
+</div>
+</div>
+
+<div class="mo" id="mo" onclick="moClose(event)"><div class="ms"><div class="mh"></div><div id="mc"></div></div></div>
+<div id="vw"><button class="vwx" onclick="vwClose()">✕</button><img id="vwi" src=""/><div id="vw-label"></div><div id="vw-actions"><button class="vw-btn dl" onclick="vwDownload()">⬇️ Download</button><button class="vw-btn" onclick="vwShare()">📤 Share</button></div></div>
+<div id="tst"></div>
+
+<script>
+const SK='myvault6';
+function ld(){try{return JSON.parse(localStorage.getItem(SK)||'{}');}catch{return{};}}
+let D=ld();
+D.p=D.p||{};D.id=D.id||{};D.med=D.med||{};
+D.fam=D.fam||[];D.fin=D.fin||{sal:'',sav:''};
+D.exp=D.exp||[];D.veh=D.veh||[];D.bnk=D.bnk||[];
+D.dn=D.dn||{};D.ph=D.ph||{};D.pin=D.pin||'1234';
+
+function sv(){try{localStorage.setItem(SK,JSON.stringify(D));toast('✅ Saved!');}catch{alert('⚠️ Storage full — delete some photos.');}}
+function toast(m){const t=document.getElementById('tst');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),1800);}
+
+const DOCKEYS=['aadhaar','pan','dl','voter','passport','ration','study','hospital','insurance','land','other'];
+const DOCID={'aadhaar':1,'pan':1,'dl':1,'voter':1,'passport':1,'ration':1};
+const FAMDKS=['aadhaar','pan','dl','voter','study','medical','other'];
+
+// ── ATTACH ALL INPUTS ON LOAD (static DOM only) ──
+window.addEventListener('DOMContentLoaded',()=>{
+  // Profile
+  document.getElementById('inp-profile').addEventListener('change',function(){
+    if(!this.files[0])return;
+    compress(this.files[0],src=>{D.ph.profile=src;sv();rID();rHome();});this.value='';
+  });
+  // My photos
+  document.getElementById('inp-myphotos').addEventListener('change',function(){
+    addPhs(this,'myphotos','g-myphotos');
+  });
+  // Doc inputs
+  DOCKEYS.forEach(key=>{
+    const ni=document.getElementById('dn-'+key);
+    if(ni)ni.addEventListener('change',function(){
+      if(DOCID[key])D.id[key]=this.value.trim();else D.dn[key]=this.value.trim();
+      sv();updDocBadge(key);rID();
+    });
+    const pi=document.getElementById('inp-doc-'+key);
+    if(pi)pi.addEventListener('change',function(){addPhs(this,'doc-'+key,'g-doc-'+key,()=>updDocBadge(key));});
+  });
+  // Family member pages (0-9)
+  for(let i=0;i<10;i++){
+    const pp=document.getElementById('inp-fam-'+i+'-profile');
+    if(pp)pp.addEventListener('change',(function(idx){return function(){
+      if(!this.files[0])return;
+      compress(this.files[0],src=>{D.ph['fam-'+idx]=src;sv();rFamDetail(idx);rFam();});this.value='';
+    };})(i));
+    FAMDKS.forEach(k=>{
+      const inp=document.getElementById('inp-fam-'+i+'-'+k);
+      if(inp)inp.addEventListener('change',(function(idx,dk){return function(){
+        addPhs(this,'fam-'+idx+'-'+dk,'g-fam-'+idx+'-'+dk,()=>updFamDocBadge(idx,dk));
+      };})(i,k));
+    });
+  }
+  // Bank pages (0-9)
+  for(let i=0;i<10;i++){
+    const inp=document.getElementById('inp-bnk-'+i);
+    if(inp)inp.addEventListener('change',(function(idx){return function(){
+      addPhs(this,'bnk-'+idx,'g-bnk-'+idx);
+    };})(i));
+  }
+});
+
+// ── PIN ──
+let pin='';
+function pt(d){if(pin.length>=4)return;pin+=d;upd();if(pin.length===4)setTimeout(chk,150);}
+function pd(){pin=pin.slice(0,-1);upd();document.getElementById('perr').textContent='';}
+function upd(){for(let i=0;i<4;i++)document.getElementById('d'+i).classList.toggle('on',i<pin.length);}
+function chk(){
+  if(pin===D.pin){document.getElementById('lock').style.display='none';document.getElementById('app').style.display='block';initApp();}
+  else{document.getElementById('perr').textContent='❌ Wrong PIN';pin='';upd();}
+}
+function lockApp(){document.getElementById('lock').style.display='flex';document.getElementById('app').style.display='none';pin='';upd();document.getElementById('perr').textContent='';}
+
+// ── INIT ──
+function initApp(){rHome();rID();rDocs();rFam();rFin();rVeh();rBnk();}
+
+// ── NAV ──
+function go(name,btn){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  const pgMap={home:'p-home',id:'p-id',doc:'p-doc',fam:'p-fam',fin:'p-fin',veh:'p-veh',bnk:'p-bnk'};
+  const pgId=pgMap[name]||name;
+  const pg=document.getElementById(pgId);
+  if(pg){pg.style.display='';pg.classList.add('on');}
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+}
+function goFamDetail(i){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  const pg=document.getElementById('p-fam-'+i);
+  if(pg){pg.style.display='';pg.classList.add('on');}
+  rFamDetail(i);
+}
+function goBnkDetail(i){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  const pg=document.getElementById('p-bnk-'+i);
+  if(pg){pg.style.display='';pg.classList.add('on');}
+  rBnkDetail(i);
+}
+
+// ── HOME ──
+function rHome(){
+  const h=new Date().getHours(),g=h<12?'Morning':h<17?'Afternoon':'Evening';
+  document.getElementById('gn').textContent='Good '+g+', '+(D.p.name||'Friend')+' 👋';
+  document.getElementById('gs').textContent=D.p.phone?'📱 '+D.p.phone:'Your personal life vault';
+  document.getElementById('gd').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('hn').textContent=D.p.name||'My Profile';
+  document.getElementById('hp').textContent=D.p.phone||'Tap to add';
+  document.getElementById('hf').textContent=D.fam.length?D.fam.length+' member(s)':'Tap to add';
+  document.getElementById('hfi').textContent=D.fin.sal?'₹'+n(D.fin.sal)+'/month':'Tap to add';
+  document.getElementById('hv').textContent=D.veh.length?D.veh[0].num+' · '+D.veh[0].name:'Tap to add';
+  document.getElementById('hb').textContent=D.bnk.length?D.bnk.length+' account(s)':'Tap to add';
+  const av=document.getElementById('hav');
+  av.innerHTML=D.ph.profile?`<img src="${D.ph.profile}" style="width:100%;height:100%;object-fit:cover;" onclick="vwOpen('${D.ph.profile}')"/>`:'👤';
+}
+
+// ── IDENTITY ──
+function rID(){
+  const p=D.p,id=D.id,m=D.med;
+  const s=(i,v)=>{const e=document.getElementById(i);if(e)e.textContent=v||'—';};
+  s('v-name',p.name);s('v-dob',p.dob);s('v-blood',p.blood);s('v-phone',p.phone);s('v-alt',p.alt);s('v-email',p.email);s('v-addr',p.addr);
+  if(p.dob){const age=Math.floor((Date.now()-new Date(p.dob))/(365.25*864e5));s('v-age',age+' yrs');}else s('v-age','—');
+  s('v-aad',id.aadhaar);s('v-pan',id.pan);s('v-vot',id.voter);s('v-dl',id.dl);s('v-pass',id.passport);s('v-rat',id.ration);
+  s('v-all',m.allergy);s('v-doc',m.doc);s('v-dph',m.dph);s('v-hosp',m.hosp);s('v-ins',m.ins);
+  const img=document.getElementById('pimg'),em=document.getElementById('pemo');
+  if(D.ph.profile){img.src=D.ph.profile;img.style.display='block';em.style.display='none';}
+  else{img.style.display='none';em.style.display='block';}
+  rGrid('myphotos','g-myphotos');
+}
+
+// ── DOCS ──
+function rDocs(){
+  DOCKEYS.forEach(k=>{
+    const num=(DOCID[k]?D.id[k]:D.dn[k])||'';
+    const ni=document.getElementById('dn-'+k);
+    if(ni)ni.value=num;
+    rGrid('doc-'+k,'g-doc-'+k);
+    updDocBadge(k);
+  });
+}
+function updDocBadge(k){
+  const num=(DOCID[k]?D.id[k]:D.dn[k])||'';
+  const phs=(D.ph['doc-'+k]||[]).length;
+  const has=num||phs>0;
+  const b=document.getElementById('db-'+k);
+  const m=document.getElementById('dm-'+k);
+  if(b){b.textContent=has?'✓ Saved':'Add';b.className='dsbadge '+(has?'bok':'bno');}
+  if(m)m.textContent=num||(phs?phs+' photo(s)':'Not saved');
+}
+
+// ── FAMILY LIST ──
+const FEMS=['👨','👩','👴','👵','👦','👧'];
+const FCOLS=['#1a2a3a','#1a3a1a','#2a1a3a','#3a1a1a','#2a2a1a'];
+function rFam(){
+  const list=document.getElementById('famlist');
+  if(!D.fam.length){list.innerHTML='<div style="color:var(--mut);text-align:center;padding:28px;font-size:13px;">No family members yet.</div>';return;}
+  list.innerHTML=D.fam.map((m,i)=>{
+    const ph=D.ph['fam-'+i];
+    const av=ph?`<img src="${ph}"/>`:`<span>${FEMS[i%6]}</span>`;
+    const dphs=FAMDKS.reduce((a,k)=>a+(D.ph['fam-'+i+'-'+k]||[]).length,0);
+    return `<div class="mstrip" onclick="goFamDetail(${i})">
+      <div class="mav" style="background:${FCOLS[i%5]}">${av}</div>
+      <div style="flex:1"><div style="font-size:15px;font-weight:700;">${m.name}</div>
+        <div style="font-size:11px;color:var(--acc);margin-top:2px;">${m.relation}</div>
+        <div style="font-size:11px;color:var(--mut);margin-top:1px;">Age ${m.age||'—'} · ${dphs} doc photo(s) saved</div>
+      </div><div style="color:var(--mut)">›</div>
+    </div>`;}).join('');
+}
+
+// ── FAMILY DETAIL ──
+function rFamDetail(i){
+  const m=D.fam[i];if(!m)return;
+  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v||'—';};
+  s('fname-'+i,m.name);s('frel-'+i,m.relation);s('fage-'+i,m.age?m.age+' yrs':'—');
+  s('fphone-'+i,m.phone);s('faad-'+i,m.aadhaar);s('fpan-'+i,m.pan);s('fblood-'+i,m.blood);s('fdob-'+i,m.dob);s('fnote-'+i,m.note);
+  // Profile photo
+  const img=document.getElementById('favimg-'+i),em=document.getElementById('favemo-'+i);
+  if(D.ph['fam-'+i]){img.src=D.ph['fam-'+i];img.style.display='block';em.style.display='none';}
+  else{img.style.display='none';em.style.display='block';}
+  // Doc grids + badges
+  FAMDKS.forEach(k=>{
+    rGrid('fam-'+i+'-'+k,'g-fam-'+i+'-'+k);
+    updFamDocBadge(i,k);
+  });
+}
+function updFamDocBadge(mi,dk){
+  const phs=(D.ph['fam-'+mi+'-'+dk]||[]).length;
+  const b=document.getElementById('fdb-'+mi+'-'+dk);
+  const m=document.getElementById('fdm-'+mi+'-'+dk);
+  if(b){b.textContent=phs>0?'✓ '+phs+' photo(s)':'Add';b.className='dsbadge '+(phs>0?'bok':'bno');}
+  if(m)m.textContent=phs>0?phs+' photo(s) saved':'No photos yet';
+}
+function delMem(i){
+  const m=D.fam[i];if(!m)return;
+  if(!confirm('Remove '+m.name+'?'))return;
+  D.fam.splice(i,1);sv();go('fam');rFam();rHome();
+}
+
+// ── FINANCE ──
+function rFin(){
+  const s=Number(D.fin.sal)||0;const tot=D.exp.reduce((a,e)=>a+Number(e.amt),0);
+  document.getElementById('vs').textContent='₹'+n(s);
+  document.getElementById('vsav').textContent='₹'+n(D.fin.sav||0);
+  document.getElementById('vte').textContent='₹'+n(tot);
+  document.getElementById('vbal').textContent='₹'+n(s-tot);
+  document.getElementById('explist').innerHTML=D.exp.length
+    ?D.exp.map((e,i)=>`<div class="ei"><div><div style="font-size:13px;font-weight:600;">${e.name}</div><div style="font-size:11px;color:var(--mut);">${e.cat}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;"><div style="font-size:14px;font-weight:800;color:var(--red);">₹${n(e.amt)}</div>
+      <button onclick="delExp(${i})" style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:15px;">✕</button></div></div>`).join('')
+    :'<div style="color:var(--mut);text-align:center;padding:18px;font-size:12px;">No expenses yet.</div>';
+}
+
+// ── VEHICLE ──
+function rVeh(){
+  document.getElementById('vehlist').innerHTML=D.veh.length
+    ?D.veh.map((v,i)=>{
+        const pgrid=rPgridHtml('veh-'+i,(src,pi)=>`onclick="delVehPh(${i},${pi})"`);
+        return `<div class="vc">
+          <div style="display:flex;justify-content:space-between;"><div><div style="font-size:14px;font-weight:700;">${v.name}</div><div style="font-size:11px;color:var(--mut);">${v.brand} · ${v.yr}</div><div class="vnum">${v.num}</div></div>
+          <button onclick="delVeh(${i})" style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:17px;">✕</button></div>
+          <div class="vg">
+            <div class="vf"><div class="vfl">Engine</div><div class="vfv">${v.eng||'—'}</div></div>
+            <div class="vf"><div class="vfl">Chassis</div><div class="vfv">${v.cha||'—'}</div></div>
+            <div class="vf"><div class="vfl">Insurance</div><div class="vfv g">${v.ins||'—'}</div></div>
+            <div class="vf"><div class="vfl">RC Expiry</div><div class="vfv">${v.rc||'—'}</div></div>
+            <div class="vf"><div class="vfl">Fuel</div><div class="vfv">${v.fuel||'—'}</div></div>
+            <div class="vf"><div class="vfl">Color</div><div class="vfv">${v.col||'—'}</div></div>
+          </div>
+          <div id="veh-upload-${i}" style="margin-top:12px;"></div>
+          <div class="pgrid" id="g-veh-${i}">${pgrid}</div>
+        </div>`;}).join('')
+    :'<div style="color:var(--mut);text-align:center;padding:28px;font-size:12px;">No vehicles yet.</div>';
+  // Insert REAL upload labels into vehicle upload slots
+  D.veh.forEach((_,i)=>{
+    const slot=document.getElementById('veh-upload-'+i);
+    if(!slot)return;
+    // Check if input already exists
+    if(document.getElementById('inp-veh-'+i))return;
+    const lbl=document.createElement('label');
+    lbl.className='uz';lbl.style='padding:11px 12px;';
+    lbl.innerHTML=`<div style="display:flex;align-items:center;gap:9px;pointer-events:none;"><span style="font-size:18px;">📷</span><div><div style="font-size:12px;font-weight:700;">Upload Vehicle Photos</div><div style="font-size:10px;color:var(--mut);">RC, insurance, bike photo</div></div></div>`;
+    const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.multiple=true;inp.id='inp-veh-'+i;
+    inp.addEventListener('change',function(){addPhs(this,'veh-'+i,'g-veh-'+i);});
+    lbl.appendChild(inp);slot.appendChild(lbl);
+  });
+}
+function rPgridHtml(key){
+  return (D.ph[key]||[]).map((s,pi)=>`<div class="pt"><img src="${s}" onclick="vwOpen('${s}')"/><button class="pdel" data-key="${key}" data-pi="${pi}" onclick="delPh('${key}',${pi},'g-${key}')">✕</button></div>`).join('');
+}
+
+// ── BANK LIST ──
+function rBnk(){
+  document.getElementById('bnklist').innerHTML=D.bnk.length
+    ?D.bnk.map((b,i)=>`<div class="bstrip" onclick="goBnkDetail(${i})">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div><div class="bname">${b.bank}</div><div class="bnum">${b.acc||'—'}</div></div>
+          <div style="background:var(--card2);border-radius:8px;padding:4px 10px;font-size:11px;color:var(--mut);">Tap for photos ›</div>
+        </div>
+        <div class="brow"><div><div class="bfl">Holder</div><div class="bfv">${b.holder||'—'}</div></div><div><div class="bfl">IFSC</div><div class="bfv">${b.ifsc||'—'}</div></div></div>
+        <div class="brow" style="margin-top:6px;"><div><div class="bfl">Branch</div><div class="bfv">${b.branch||'—'}</div></div><div><div class="bfl">UPI ID</div><div class="bfv" style="color:var(--pur)">${b.upi||'—'}</div></div></div>
+        ${(D.ph['bnk-'+i]||[]).length?`<div style="font-size:11px;color:var(--grn);margin-top:8px;">📷 ${D.ph['bnk-'+i].length} photo(s) saved</div>`:''}
+      </div>`).join('')
+    :'<div style="color:var(--mut);text-align:center;padding:28px;font-size:12px;">No bank accounts yet.</div>';
+}
+
+// ── BANK DETAIL ──
+function rBnkDetail(i){
+  const b=D.bnk[i];if(!b)return;
+  const info=document.getElementById('bnk-info-'+i);
+  if(info)info.innerHTML=`<div class="bstrip" style="cursor:default;margin-bottom:4px;">
+    <div class="bname">${b.bank}</div><div class="bnum">${b.acc||'—'}</div>
+    <div class="brow"><div><div class="bfl">Holder</div><div class="bfv">${b.holder||'—'}</div></div><div><div class="bfl">IFSC</div><div class="bfv">${b.ifsc||'—'}</div></div></div>
+    <div class="brow" style="margin-top:6px;"><div><div class="bfl">Branch</div><div class="bfv">${b.branch||'—'}</div></div><div><div class="bfl">UPI ID</div><div class="bfv p">${b.upi||'—'}</div></div></div>
+  </div>`;
+  rGrid('bnk-'+i,'g-bnk-'+i);
+}
+function delBnk(i){
+  if(!confirm('Remove this account?'))return;
+  D.bnk.splice(i,1);sv();go('bnk');rBnk();rHome();
+}
+function delVehPh(vi,pi){if(!D.ph['veh-'+vi])return;D.ph['veh-'+vi].splice(pi,1);sv();rVeh();}
+
+// ── PHOTOS ──
+function compress(file,cb){
+  const r=new FileReader();
+  r.onload=e=>{const img=new Image();img.onload=()=>{
+    const c=document.createElement('canvas');let w=img.width,h=img.height,M=1400;
+    if(w>M){h=Math.round(h*M/w);w=M;}if(h>M){w=Math.round(w*M/h);h=M;}
+    c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',.72));
+  };img.src=e.target.result;};r.readAsDataURL(file);
+}
+function addPhs(input,key,gridId,cb){
+  if(!D.ph[key])D.ph[key]=[];
+  let done=0;const files=Array.from(input.files);if(!files.length)return;
+  files.forEach(f=>compress(f,src=>{D.ph[key].push(src);done++;if(done===files.length){sv();rGrid(key,gridId);if(cb)cb();}}));
+  input.value='';
+}
+function rGrid(key,gridId){
+  const g=document.getElementById(gridId);if(!g)return;
+  g.innerHTML=(D.ph[key]||[]).map((s,i)=>`<div class="pt"><img src="${s}" onclick="vwOpen('${s}')"/><button class="pdel" onclick="delPh('${key}',${i},'${gridId}')">✕</button></div>`).join('');
+}
+function delPh(key,idx,gridId){if(!D.ph[key])return;D.ph[key].splice(idx,1);sv();rGrid(key,gridId);}
+let _vwSrc='';
+function vwOpen(src,label){
+  _vwSrc=src;
+  document.getElementById('vwi').src=src;
+  const lb=document.getElementById('vw-label');
+  if(lb)lb.textContent=label||'';
+  document.getElementById('vw').classList.add('on');
+}
+function vwClose(){document.getElementById('vw').classList.remove('on');_vwSrc='';}
+function vwDownload(){
+  if(!_vwSrc)return;
+  const a=document.createElement('a');
+  a.href=_vwSrc;
+  // Create a filename from timestamp
+  const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  a.download='MyVault-photo-'+ts+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  toast('✅ Photo downloaded!');
+}
+function vwShare(){
+  if(!_vwSrc)return;
+  // Convert base64 to blob for Web Share API
+  try{
+    fetch(_vwSrc).then(r=>r.blob()).then(blob=>{
+      const file=new File([blob],'MyVault-photo.jpg',{type:'image/jpeg'});
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        navigator.share({files:[file],title:'MyVault Photo'}).catch(()=>{});
+      } else {
+        // Fallback: just download
+        vwDownload();
+      }
+    });
+  }catch(e){vwDownload();}
+}
+
+// ── MODALS ──
+function om(type,extra){
+  let h='';
+  if(type==='personal'){const p=D.p;
+    h=`<div class="mt">👤 Personal Info</div>
+    <div class="fg"><label class="fl">Full Name</label><input class="fi" id="m-name" value="${p.name||''}" placeholder="Full name"/></div>
+    <div class="r2"><div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="m-dob" type="date" value="${p.dob||''}"/></div>
+    <div class="fg"><label class="fl">Blood Group</label><input class="fi" id="m-blood" value="${p.blood||''}" placeholder="A+"/></div></div>
+    <div class="fg"><label class="fl">Phone</label><input class="fi" id="m-ph" value="${p.phone||''}" placeholder="10-digit"/></div>
+    <div class="fg"><label class="fl">Alt Phone</label><input class="fi" id="m-alt" value="${p.alt||''}" placeholder="Alternate"/></div>
+    <div class="fg"><label class="fl">Email</label><input class="fi" id="m-em" value="${p.email||''}" placeholder="email@gmail.com"/></div>
+    <div class="fg"><label class="fl">Address</label><input class="fi" id="m-addr" value="${p.addr||''}" placeholder="Full address"/></div>
+    <button class="sbtn" onclick="saveP()">Save</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='ids'){const id=D.id;
+    h=`<div class="mt">🪪 ID Numbers</div>
+    <div class="fg"><label class="fl">Aadhaar</label><input class="fi" id="m-aad" value="${id.aadhaar||''}" placeholder="XXXX XXXX XXXX"/></div>
+    <div class="fg"><label class="fl">PAN</label><input class="fi" id="m-pan" value="${id.pan||''}" placeholder="ABCDE1234F"/></div>
+    <div class="fg"><label class="fl">Voter ID</label><input class="fi" id="m-vot" value="${id.voter||''}" placeholder="Voter ID"/></div>
+    <div class="fg"><label class="fl">DL</label><input class="fi" id="m-dl" value="${id.dl||''}" placeholder="DL number"/></div>
+    <div class="fg"><label class="fl">Passport</label><input class="fi" id="m-pass" value="${id.passport||''}" placeholder="Passport number"/></div>
+    <div class="fg"><label class="fl">Ration Card</label><input class="fi" id="m-rat" value="${id.ration||''}" placeholder="Ration number"/></div>
+    <button class="sbtn" onclick="saveID2()">Save</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='med'){const m=D.med;
+    h=`<div class="mt">🏥 Medical</div>
+    <div class="fg"><label class="fl">Allergies</label><input class="fi" id="m-all" value="${m.allergy||''}" placeholder="Allergies"/></div>
+    <div class="fg"><label class="fl">Doctor</label><input class="fi" id="m-doc" value="${m.doc||''}" placeholder="Dr. Name"/></div>
+    <div class="fg"><label class="fl">Doctor Phone</label><input class="fi" id="m-dph" value="${m.dph||''}" placeholder="Phone"/></div>
+    <div class="fg"><label class="fl">Hospital</label><input class="fi" id="m-hosp" value="${m.hosp||''}" placeholder="Hospital"/></div>
+    <div class="fg"><label class="fl">Insurance No.</label><input class="fi" id="m-ins" value="${m.ins||''}" placeholder="Policy number"/></div>
+    <button class="sbtn" onclick="saveMed()">Save</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='addmem'||type==='editmem'){
+    const m=type==='editmem'&&extra!==undefined?D.fam[extra]:{};
+    const isEdit=type==='editmem';
+    h=`<div class="mt">${isEdit?'✏️ Edit':'👤 Add'} Family Member</div>
+    <div class="fg"><label class="fl">Full Name</label><input class="fi" id="fm-name" value="${m.name||''}" placeholder="Name"/></div>
+    <div class="r2"><div class="fg"><label class="fl">Relation</label><input class="fi" id="fm-rel" value="${m.relation||''}" placeholder="Wife, Son..."/></div>
+    <div class="fg"><label class="fl">Age</label><input class="fi" id="fm-age" type="number" value="${m.age||''}" placeholder="Age"/></div></div>
+    <div class="fg"><label class="fl">Phone</label><input class="fi" id="fm-ph" value="${m.phone||''}" placeholder="Phone"/></div>
+    <div class="fg"><label class="fl">Aadhaar No.</label><input class="fi" id="fm-aad" value="${m.aadhaar||''}" placeholder="Aadhaar"/></div>
+    <div class="fg"><label class="fl">PAN No.</label><input class="fi" id="fm-pan" value="${m.pan||''}" placeholder="PAN"/></div>
+    <div class="r2"><div class="fg"><label class="fl">Blood Group</label><input class="fi" id="fm-blood" value="${m.blood||''}" placeholder="A+"/></div>
+    <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="fm-dob" type="date" value="${m.dob||''}"/></div></div>
+    <div class="fg"><label class="fl">Notes</label><input class="fi" id="fm-note" value="${m.note||''}" placeholder="Notes"/></div>
+    <button class="sbtn" onclick="saveMem(${isEdit?extra:'undefined'})">${isEdit?'Update':'Add Member'}</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='sal'){
+    h=`<div class="mt">💰 Salary</div>
+    <div class="fg"><label class="fl">Monthly Salary (₹)</label><input class="fi" id="m-sal" type="number" value="${D.fin.sal||''}" placeholder="Salary"/></div>
+    <div class="fg"><label class="fl">Savings Target (₹)</label><input class="fi" id="m-sav" type="number" value="${D.fin.sav||''}" placeholder="Savings"/></div>
+    <button class="sbtn" onclick="saveSal()">Save</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='addexp'){
+    h=`<div class="mt">➕ Add Expense</div>
+    <div class="fg"><label class="fl">Name</label><input class="fi" id="ex-n" placeholder="Rent, EMI, Grocery..."/></div>
+    <div class="r2"><div class="fg"><label class="fl">Amount (₹)</label><input class="fi" id="ex-a" type="number" placeholder="Amount"/></div>
+    <div class="fg"><label class="fl">Category</label><input class="fi" id="ex-c" placeholder="Housing, Food..."/></div></div>
+    <button class="sbtn" onclick="saveExp()">Add</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='addveh'){
+    h=`<div class="mt">🏍️ Add Vehicle</div>
+    <div class="fg"><label class="fl">Name</label><input class="fi" id="vn" placeholder="Honda Activa..."/></div>
+    <div class="r2"><div class="fg"><label class="fl">Brand</label><input class="fi" id="vb" placeholder="Honda..."/></div>
+    <div class="fg"><label class="fl">Year</label><input class="fi" id="vyr" placeholder="2022"/></div></div>
+    <div class="fg"><label class="fl">Reg. Number</label><input class="fi" id="vnum2" placeholder="TN 01 AB 1234"/></div>
+    <div class="r2"><div class="fg"><label class="fl">Engine No.</label><input class="fi" id="veng" placeholder="Engine no."/></div>
+    <div class="fg"><label class="fl">Chassis No.</label><input class="fi" id="vcha" placeholder="Chassis no."/></div></div>
+    <div class="r2"><div class="fg"><label class="fl">Fuel</label><input class="fi" id="vfuel" placeholder="Petrol/Diesel"/></div>
+    <div class="fg"><label class="fl">Color</label><input class="fi" id="vcol" placeholder="Color"/></div></div>
+    <div class="r2"><div class="fg"><label class="fl">Insurance Expiry</label><input class="fi" id="vins" type="date"/></div>
+    <div class="fg"><label class="fl">RC Expiry</label><input class="fi" id="vrc" type="date"/></div></div>
+    <button class="sbtn" onclick="saveVeh()">Save</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='changepin'){
+    h=`<div class="mt">🔑 Change PIN</div>
+    <div class="fg"><label class="fl">Current PIN</label><input class="fi" id="cp-cur" type="password" inputmode="numeric" maxlength="4" placeholder="Enter current PIN"/></div>
+    <div class="fg"><label class="fl">New PIN (4 digits)</label><input class="fi" id="cp-new" type="password" inputmode="numeric" maxlength="4" placeholder="Enter new PIN"/></div>
+    <div class="fg"><label class="fl">Confirm New PIN</label><input class="fi" id="cp-con" type="password" inputmode="numeric" maxlength="4" placeholder="Confirm new PIN"/></div>
+    <button class="sbtn" onclick="changePin()">Update PIN</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  else if(type==='addbnk'){
+    h=`<div class="mt">🏦 Add Bank Account</div>
+    <div class="fg"><label class="fl">Bank Name</label><input class="fi" id="bn-n" placeholder="SBI, HDFC..."/></div>
+    <div class="fg"><label class="fl">Account Number</label><input class="fi" id="bn-acc" placeholder="Account number"/></div>
+    <div class="fg"><label class="fl">Holder Name</label><input class="fi" id="bn-h" placeholder="Name as in bank"/></div>
+    <div class="fg"><label class="fl">IFSC Code</label><input class="fi" id="bn-i" placeholder="SBIN0001234"/></div>
+    <div class="fg"><label class="fl">Branch</label><input class="fi" id="bn-br" placeholder="Branch name"/></div>
+    <div class="fg"><label class="fl">UPI ID</label><input class="fi" id="bn-u" placeholder="yourname@upi"/></div>
+    <button class="sbtn" onclick="saveBnk()">Save Account</button><button class="xbtn" onclick="cm()">Cancel</button>`;}
+  document.getElementById('mc').innerHTML=h;
+  document.getElementById('mo').classList.add('on');
+}
+function cm(){document.getElementById('mo').classList.remove('on');}
+function moClose(e){if(e.target===document.getElementById('mo'))cm();}
+
+const g=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
+const n=v=>Number(v).toLocaleString('en-IN');
+
+function saveP(){D.p={...D.p,name:g('m-name'),dob:g('m-dob'),blood:g('m-blood'),phone:g('m-ph'),alt:g('m-alt'),email:g('m-em'),addr:g('m-addr')};sv();cm();rID();rHome();}
+function saveID2(){D.id={...D.id,aadhaar:g('m-aad'),pan:g('m-pan'),voter:g('m-vot'),dl:g('m-dl'),passport:g('m-pass'),ration:g('m-rat')};sv();cm();rID();rDocs();}
+function saveMed(){D.med={allergy:g('m-all'),doc:g('m-doc'),dph:g('m-dph'),hosp:g('m-hosp'),ins:g('m-ins')};sv();cm();rID();}
+function saveMem(idx){
+  const m={name:g('fm-name'),relation:g('fm-rel'),age:g('fm-age'),phone:g('fm-ph'),aadhaar:g('fm-aad'),pan:g('fm-pan'),blood:g('fm-blood'),dob:g('fm-dob'),note:g('fm-note')};
+  if(!m.name)return alert('Enter name.');
+  if(idx!==undefined&&idx!==null&&D.fam[idx]){D.fam[idx]={...D.fam[idx],...m};sv();cm();rFamDetail(idx);}
+  else{D.fam.push(m);sv();cm();}
+  rFam();rHome();
+}
+function saveSal(){D.fin.sal=g('m-sal');D.fin.sav=g('m-sav');sv();cm();rFin();rHome();}
+function saveExp(){const e={name:g('ex-n'),amt:g('ex-a'),cat:g('ex-c')};if(!e.name||!e.amt)return alert('Enter name and amount.');D.exp.push(e);sv();cm();rFin();}
+function delExp(i){D.exp.splice(i,1);sv();rFin();}
+function saveVeh(){const v={name:g('vn'),brand:g('vb'),yr:g('vyr'),num:g('vnum2'),eng:g('veng'),cha:g('vcha'),fuel:g('vfuel'),col:g('vcol'),ins:g('vins'),rc:g('vrc')};if(!v.name)return alert('Enter vehicle name.');D.veh.push(v);sv();cm();rVeh();rHome();}
+function delVeh(i){if(!confirm('Remove?'))return;D.veh.splice(i,1);sv();rVeh();rHome();}
+function saveBnk(){const b={bank:g('bn-n'),acc:g('bn-acc'),holder:g('bn-h'),ifsc:g('bn-i'),branch:g('bn-br'),upi:g('bn-u')};if(!b.bank)return alert('Enter bank name.');D.bnk.push(b);sv();cm();rBnk();rHome();}
+
+// ── CHANGE PIN ──
+function changePin(){
+  const cur=g('cp-cur'),np=g('cp-new'),con=g('cp-con');
+  if(cur!==D.pin){toast('❌ Current PIN is wrong!');return;}
+  if(np.length!==4||!/^[0-9]{4}$/.test(np)){toast('❌ New PIN must be exactly 4 digits!');return;}
+  if(np!==con){toast('❌ PINs do not match!');return;}
+  D.pin=np;sv();cm();
+  toast('✅ PIN changed successfully!');
+}
+
+// ── PWA INSTALL ──
+let _installPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _installPrompt = e;
+  const btn = document.getElementById('install-btn');
+  if(btn) btn.style.display = 'flex';
+});
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('install-btn');
+  if(btn) btn.style.display = 'none';
+  toast('✅ MyVault installed! Find it on your home screen.');
+});
+function installApp(){
+  if(_installPrompt){
+    _installPrompt.prompt();
+    _installPrompt.userChoice.then(()=>{ _installPrompt=null; });
+  } else {
+    // iOS or fallback: show instructions
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if(isIOS){
+      alert('📲 To install on iPhone/iPad:\n\n1. Tap the Share button (□↑) at the bottom\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" — done!');
+    } else {
+      alert('📲 To install:\n\nIn Chrome: tap the 3-dot menu (⋮) at the top right, then tap "Add to Home Screen" or "Install App".');
+    }
+  }
+}
+
+// ── DOWNLOAD BACKUP ──
+// Exports all your data as a JSON file — import it back anytime
+function downloadBackup(){
+  toast('⏳ Preparing backup...');
+  setTimeout(()=>{
+    try{
+      // Export data as JSON (works perfectly on all phones)
+      const exportData = {
+        version: 'myvault6',
+        exported: new Date().toISOString(),
+        data: D
+      };
+      const json = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([json], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toLocaleDateString('en-IN').replace(/\//g,'-');
+      a.href = url;
+      a.download = 'MyVault-backup-' + date + '.json';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 300);
+      toast('✅ Backup saved! Keep the .json file safe.');
+    }catch(e){
+      // Ultimate fallback: copy data to clipboard
+      try{
+        const json = JSON.stringify({version:'myvault6', data:D});
+        navigator.clipboard.writeText(json).then(()=>{
+          toast('📋 Data copied to clipboard — paste it somewhere safe!');
+        }).catch(()=> alert('Backup data:\n\n'+JSON.stringify({version:'myvault6',data:D})));
+      }catch(e2){ alert('Could not backup: '+e2.message); }
+    }
+  }, 100);
+}
+
+// ── IMPORT BACKUP ──
+function importBackup(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try{
+        const parsed = JSON.parse(ev.target.result);
+        if(parsed.version !== 'myvault6' || !parsed.data) throw new Error('Invalid backup file');
+        if(!confirm('⚠️ This will replace ALL current data with the backup. Continue?')) return;
+        D = parsed.data;
+        sv();
+        toast('✅ Backup restored successfully!');
+        rHome(); rID(); rFam(); rFin(); rDocs(); rVeh(); rBnk();
+      }catch(err){ alert('❌ Could not restore: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(()=> document.body.removeChild(input), 1000);
+}
+</script>
+</body>
+</html>
